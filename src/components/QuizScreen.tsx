@@ -163,7 +163,9 @@ export function QuizScreen({ onNavigate, onComplete }: QuizScreenProps) {
       climate: answers.climate as string
     };
     
+    // Propagate profile to parent and navigate to Profile screen so the user can view/edit it
     onComplete(profile);
+    onNavigate('profile');
     setIsComplete(true);
   };
 

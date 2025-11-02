@@ -8,8 +8,11 @@ import { ReviewsScreen } from "./components/ReviewsScreen"
 import { ProfileScreen } from "./components/ProfileScreen"
 import { QuizScreen } from "./components/QuizScreen"
 import { BottomNavigation } from "./components/BottomNavigation"
+import Footer from "./components/ui/footer"
+import { LoginScreen } from "./components/LoginScreen"
+import { RegisterScreen } from "./components/RegisterScreen"
 
-export type Screen = "home" | "analysis" | "comparison" | "reviews" | "profile" | "quiz"
+export type Screen = "home" | "analysis" | "comparison" | "reviews" | "profile" | "quiz" | "login"
 
 export interface Product {
   id: string
@@ -56,6 +59,7 @@ export default function App() {
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null)
   const [comparisonProducts, setComparisonProducts] = useState<Product[]>([])
   const [skinProfile, setSkinProfile] = useState<SkinProfile | null>(null)
+  const [user, setUser] = useState<{ name: string; email: string } | null>(null);
 
   const renderScreen = () => {
     switch (currentScreen) {
@@ -79,6 +83,10 @@ export default function App() {
         )
       case "quiz":
         return <QuizScreen onNavigate={setCurrentScreen} onComplete={setSkinProfile} />
+      case "login":
+        return <LoginScreen onNavigate={setCurrentScreen} onLogin={(user) => setUser(user)} />
+      case "register":
+        return <RegisterScreen onNavigate={setCurrentScreen} />
       default:
         return (
           <HomeScreen onProductScanned={setSelectedProduct} onNavigate={setCurrentScreen} skinProfile={skinProfile} />
@@ -113,13 +121,17 @@ export default function App() {
     <div className="min-h-screen bg-gradient-to-br from-pink-50 via-rose-50 to-pink-100">
       {/* Header Navigation */}
       <header className="bg-white/80 backdrop-blur-sm border-b border-pink-200 sticky top-0 z-50">
-        <div className="container mx-auto px-6 py-4">
+        <div className="container mx-auto px-6">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-3">
-              <div className="text-2xl font-bold bg-gradient-to-r from-pink-600 to-rose-600 bg-clip-text text-transparent">
-                SK INFO
-              </div>
+              <img src="/src/assets/logo.png" alt="SKINFO Logo" className="h-20 w-20" />
             </div>
+            {user ? (
+              <span className="text-pink-600 font-medium">Hi, {user.name.split(" ")[0]}!</span>
+            ) : (
+              <></>
+            )}
+
 
             <nav className="hidden md:flex items-center space-x-8">
               <button
@@ -182,6 +194,16 @@ export default function App() {
               >
                 Profile
               </button>
+              <button
+                onClick={() => setCurrentScreen("login")}
+                className={`px-4 py-2 rounded-full transition-all ${
+                  currentScreen === "login"
+                    ? "bg-pink-100 text-pink-700"
+                    : "text-gray-600 hover:text-pink-600 hover:bg-pink-50"
+                }`}
+              >
+                Login
+              </button>
             </nav>
 
             {/* Mobile menu button */}
@@ -201,6 +223,8 @@ export default function App() {
       <div className="md:hidden">
         <BottomNavigation currentScreen={currentScreen} onNavigate={setCurrentScreen} />
       </div>
+
+      <Footer />
     </div>
   )
 }
