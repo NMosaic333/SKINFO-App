@@ -1,9 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ArrowLeft, Star, AlertTriangle, CheckCircle, XCircle, ChevronDown, ChevronUp, Info, User, Heart, ShieldAlert } from 'lucide-react';
 import { Button } from './ui/button';
 import { Card } from './ui/card';
 import { Badge } from './ui/badge';
 import { ImageWithFallback } from './figma/ImageWithFallback';
+import { getLastAnalysis, formatRecommendation } from '../utils/gemini-analysis';
+import type { GeminiAnalysisData } from '../utils/gemini-analysis';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from './ui/collapsible';
 import type { Product, Screen, Ingredient, SkinProfile } from '../App';
 
@@ -73,6 +75,17 @@ function IngredientCard({ ingredient }: { ingredient: Ingredient }) {
 }
 
 export function AnalysisScreen({ product, onNavigate, skinProfile }: AnalysisScreenProps) {
+  const [analysisData, setAnalysisData] = useState<GeminiAnalysisData | null>(null);
+
+  useEffect(() => {
+    try {
+      const data = getLastAnalysis();
+      setAnalysisData(data);
+    } catch (e) {
+      // ignore if session storage not available
+    }
+  }, []);
+
   if (!product) {
     return (
       <div className="p-6 flex flex-col items-center justify-center h-full space-y-4">
@@ -179,6 +192,35 @@ export function AnalysisScreen({ product, onNavigate, skinProfile }: AnalysisScr
         </Button>
       </div>
 
+      {/* Recommendation hero (prominent) */}
+      {analysisData && analysisData.recommendation && (
+        <Card className="p-8 rounded-2xl bg-gradient-to-r from-pink-500 to-rose-500 text-white shadow-xl">
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6">
+            <div className="max-w-3xl">
+              <h2 className="text-3xl md:text-4xl font-extrabold mb-3">Recommended for you</h2>
+              <div className="space-y-2 text-white/90">
+                {formatRecommendation(analysisData.recommendation)
+                  .split('\n')
+                  .map((line, idx) => (
+                    <p key={idx} className="text-base md:text-lg leading-relaxed">{line}</p>
+                  ))}
+              </div>
+            </div>
+
+            {analysisData.usageInstructions && (
+              <div className="min-w-[220px] bg-white/10 p-4 rounded-lg">
+                <h4 className="font-semibold text-white">How to use in your routine: </h4>
+                <div className="mt-2 text-white/90 text-sm space-y-1">
+                  {analysisData.usageInstructions.split('\n').map((line, idx) => (
+                    <p key={idx}>{line}</p>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </Card>
+      )}
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Left Column - Product Info */}
         <div className="lg:col-span-1 space-y-6">
@@ -280,6 +322,31 @@ export function AnalysisScreen({ product, onNavigate, skinProfile }: AnalysisScr
               </div>
             </div>
           </Card>
+
+          {/* Recommendation & Usage (from analysis) */}
+          {analysisData && analysisData.recommendation && (
+            <Card className="p-6 bg-white/80 border-pink-100">
+              <h3 className="text-lg mb-3">💡 Recommendation</h3>
+              <div className="text-sm text-gray-700 space-y-2">
+                {formatRecommendation(analysisData.recommendation)
+                  .split('\n')
+                  .map((line, idx) => (
+                    <p key={idx}>{line}</p>
+                  ))}
+              </div>
+            </Card>
+          )}
+
+          {analysisData && analysisData.usageInstructions && (
+            <Card className="p-6 bg-white/80 border-pink-100">
+              <h3 className="text-lg mb-3">🧴 How to use</h3>
+              <div className="text-sm text-gray-700 space-y-2">
+                {analysisData.usageInstructions.split('\n').map((line, idx) => (
+                  <p key={idx}>{line}</p>
+                ))}
+              </div>
+            </Card>
+          )}
 
           {/* Allergens */}
           {product.allergens.length > 0 && (

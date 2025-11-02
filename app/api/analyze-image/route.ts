@@ -81,7 +81,7 @@ Please analyze this skincare product image and provide:
 3. Safety rating for this user (SAFE, CAUTION, or HARMFUL) based on their skin profile
 4. Specific recommendation explaining WHY this product is suitable or not suitable for their skin
 5. Any potential allergens or irritants to watch for
-6. Suggested usage instructions
+6. Suggested usage instructions in their skincare routine
 
 Format your response as JSON with these exact keys:
 {

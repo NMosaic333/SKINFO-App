@@ -169,7 +169,7 @@ export function HomeScreen({ onProductScanned, onNavigate, skinProfile }: HomeSc
         {/* Background Image with Overlay */}
         <div className="absolute inset-0 rounded-3xl overflow-hidden">
           <ImageWithFallback
-            src="https://images.unsplash.com/photo-1642383511822-b493c213faca?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxzb2Z0JTIwcGluayUyMHNraW5jYXJlJTIwYmFja2dyb3VuZHxlbnwxfHx8fDE3NjE2NTU5ODB8MA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral"
+            src="../assets/logo"
             alt="Background"
             className="w-full h-full object-cover opacity-30"
           />
@@ -180,7 +180,7 @@ export function HomeScreen({ onProductScanned, onNavigate, skinProfile }: HomeSc
           <div className="text-center md:text-left space-y-6">
             <div className="flex justify-center md:justify-start mb-6">
               <div className="text-3xl font-bold bg-gradient-to-r from-pink-600 to-rose-600 bg-clip-text text-transparent">
-                SK INFO
+                =
               </div>
             </div>
             <h1 className="text-4xl md:text-5xl bg-gradient-to-r from-pink-600 to-rose-600 bg-clip-text text-transparent mb-4">
@@ -194,7 +194,7 @@ export function HomeScreen({ onProductScanned, onNavigate, skinProfile }: HomeSc
           </div>
           <div className="hidden md:block">
             <ImageWithFallback
-              src="https://images.unsplash.com/photo-1631050165423-3f29788b977b?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxza2luY2FyZSUyMGJlYXV0eSUyMGxpZmVzdHlsZXxlbnwxfHx8fDE3NjE1NDQ3Nzh8MA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral"
+              src="../assets/logo"
               alt="Skincare lifestyle"
               className="w-full h-80 object-cover rounded-2xl shadow-lg"
             />

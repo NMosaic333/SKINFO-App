@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ArrowLeft, User, Settings, Bell, Shield, Heart, Star, ChevronRight, Edit } from 'lucide-react';
 import { Button } from './ui/button';
 import { Card } from './ui/card';
@@ -7,16 +7,18 @@ import { Switch } from './ui/switch';
 import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { ImageWithFallback } from './figma/ImageWithFallback';
-import type { Screen } from '../App';
+import type { Screen, SkinProfile } from '../App';
 
 interface ProfileScreenProps {
   onNavigate: (screen: Screen) => void;
+  skinProfile?: SkinProfile | null;
+  onUpdateProfile?: (profile: SkinProfile | null) => void;
 }
 
-export function ProfileScreen({ onNavigate }: ProfileScreenProps) {
-  const [skinType, setSkinType] = useState('combination');
-  const [concerns, setConcerns] = useState(['acne', 'aging']);
-  const [allergies, setAllergies] = useState(['fragrance', 'parabens']);
+export function ProfileScreen({ onNavigate, skinProfile, onUpdateProfile }: ProfileScreenProps) {
+  const [skinType, setSkinType] = useState<string>(skinProfile?.skinType ?? 'combination');
+  const [concerns, setConcerns] = useState<string[]>(skinProfile?.concerns ?? ['acne', 'aging']);
+  const [allergies, setAllergies] = useState<string[]>(skinProfile?.sensitivities ?? ['fragrance', 'parabens']);
   const [notifications, setNotifications] = useState(true);
   const [darkMode, setDarkMode] = useState(false);
 
@@ -43,20 +45,56 @@ export function ProfileScreen({ onNavigate }: ProfileScreenProps) {
   ];
 
   const toggleConcern = (concern: string) => {
-    setConcerns(prev => 
-      prev.includes(concern) 
-        ? prev.filter(c => c !== concern)
-        : [...prev, concern]
-    );
+    setConcerns(prev => {
+      const next = prev.includes(concern) ? prev.filter(c => c !== concern) : [...prev, concern];
+      onUpdateProfile?.({
+        skinType: skinType,
+        concerns: next,
+        sensitivities: allergies,
+        age: skinProfile?.age ?? '',
+        routine: skinProfile?.routine ?? '',
+        climate: skinProfile?.climate ?? ''
+      });
+      return next;
+    });
   };
 
   const toggleAllergy = (allergy: string) => {
-    setAllergies(prev => 
-      prev.includes(allergy) 
-        ? prev.filter(a => a !== allergy)
-        : [...prev, allergy]
-    );
+    setAllergies(prev => {
+      const next = prev.includes(allergy) ? prev.filter(a => a !== allergy) : [...prev, allergy];
+      onUpdateProfile?.({
+        skinType: skinType,
+        concerns: concerns,
+        sensitivities: next,
+        age: skinProfile?.age ?? '',
+        routine: skinProfile?.routine ?? '',
+        climate: skinProfile?.climate ?? ''
+      });
+      return next;
+    });
   };
+
+  // Sync local state when incoming profile changes (e.g., after completing quiz)
+  useEffect(() => {
+    if (!skinProfile) return;
+    setSkinType(skinProfile.skinType ?? 'combination');
+    setConcerns(skinProfile.concerns ?? []);
+    setAllergies(skinProfile.sensitivities ?? []);
+  }, [skinProfile]);
+
+  // Propagate skinType changes to parent profile
+  useEffect(() => {
+    onUpdateProfile?.({
+      skinType,
+      concerns,
+      sensitivities: allergies,
+      age: skinProfile?.age ?? '',
+      routine: skinProfile?.routine ?? '',
+      climate: skinProfile?.climate ?? ''
+    });
+  // We want to run this when skinType changes
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [skinType]);
 
   return (
     <div className="space-y-8 max-w-4xl mx-auto">

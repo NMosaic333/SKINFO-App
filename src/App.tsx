@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { HomeScreen } from "./components/HomeScreen"
 import { AnalysisScreen } from "./components/AnalysisScreen"
 import { ComparisonScreen } from "./components/ComparisonScreen"
@@ -70,7 +70,13 @@ export default function App() {
       case "reviews":
         return <ReviewsScreen onNavigate={setCurrentScreen} />
       case "profile":
-        return <ProfileScreen onNavigate={setCurrentScreen} />
+        return (
+          <ProfileScreen
+            onNavigate={setCurrentScreen}
+            skinProfile={skinProfile}
+            onUpdateProfile={setSkinProfile}
+          />
+        )
       case "quiz":
         return <QuizScreen onNavigate={setCurrentScreen} onComplete={setSkinProfile} />
       default:
@@ -79,6 +85,29 @@ export default function App() {
         )
     }
   }
+  
+  // Navigate wrapper that offers to load the last analysis when user opens the Analysis screen
+  const navigateTo = (screen: Screen) => {
+    if (screen === 'analysis' && !selectedProduct) {
+      try {
+        // lazy-import to avoid circular issues
+        // eslint-disable-next-line @typescript-eslint/no-var-requires
+        const { getLastAnalysis } = require('./utils/gemini-analysis') as typeof import('./utils/gemini-analysis')
+        const last = getLastAnalysis()
+        if (last && last.product) {
+          const load = window.confirm('Load last analysis from this session?')
+          if (load) {
+            setSelectedProduct(last.product as Product)
+          }
+        }
+      } catch (e) {
+        // ignore
+      }
+    }
+
+    setCurrentScreen(screen)
+  }
+
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-pink-50 via-rose-50 to-pink-100">
