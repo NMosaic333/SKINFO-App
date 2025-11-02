@@ -1,55 +1,166 @@
-import React from 'react';
-import { Camera, Upload, Clock, Sparkles, Shield, Leaf, User, ArrowRight, CheckCircle } from 'lucide-react';
-import { Button } from './ui/button';
-import { Card } from './ui/card';
-import { Badge } from './ui/badge';
-import { ImageWithFallback } from './figma/ImageWithFallback';
-import type { Product, Screen, SkinProfile } from '../App';
-import logoImage from 'figma:asset/1d8b419d7b6966630d8cc63b320c1b9a7049db0b.png';
+"use client"
+import { Camera, Upload, Clock, Sparkles, Shield, User, ArrowRight, CheckCircle } from "lucide-react"
+import type React from "react"
+
+import { Button } from "./ui/button"
+import { Card } from "./ui/card"
+import { Badge } from "./ui/badge"
+import { ImageWithFallback } from "./figma/ImageWithFallback"
+import type { Product, Screen, SkinProfile } from "../App"
+import { useState, useRef } from "react"
+import { analyzeProductImage } from "../utils/api-client"
+import { useAuth } from "../hooks/useAuth"
 
 interface HomeScreenProps {
-  onProductScanned: (product: Product) => void;
-  onNavigate: (screen: Screen) => void;
-  skinProfile: SkinProfile | null;
+  onProductScanned: (product: Product) => void
+  onNavigate: (screen: Screen) => void
+  skinProfile: SkinProfile | null
 }
 
 const mockProduct: Product = {
-  id: '1',
-  name: 'Vitamin C Brightening Serum',
-  brand: 'Glow Botanics',
-  image: 'https://images.unsplash.com/photo-1715750968540-841103c78d47?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxza2luY2FyZSUyMHNlcnVtJTIwZHJvcHBlcnxlbnwxfHx8fDE3NTk4MTA2NTh8MA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral',
+  id: "1",
+  name: "Vitamin C Brightening Serum",
+  brand: "Glow Botanics",
+  image:
+    "https://images.unsplash.com/photo-1715750968540-841103c78d47?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxza2luY2FyZSUyMHNlcnVtJTIwZHJvcHBlcnxlbnwxfHx8fDE3NTk4MTA2NTh8MA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral",
   ingredients: [
-    { name: 'Vitamin C (L-Ascorbic Acid)', purpose: 'Antioxidant', safety: 'safe', description: 'Powerful antioxidant that brightens skin', concentration: '15%' },
-    { name: 'Hyaluronic Acid', purpose: 'Hydrating', safety: 'safe', description: 'Attracts and retains moisture' },
-    { name: 'Fragrance', purpose: 'Scent', safety: 'caution', description: 'May cause irritation in sensitive skin' }
+    {
+      name: "Vitamin C (L-Ascorbic Acid)",
+      purpose: "Antioxidant",
+      safety: "safe",
+      description: "Powerful antioxidant that brightens skin",
+      concentration: "15%",
+    },
+    { name: "Hyaluronic Acid", purpose: "Hydrating", safety: "safe", description: "Attracts and retains moisture" },
+    { name: "Fragrance", purpose: "Scent", safety: "caution", description: "May cause irritation in sensitive skin" },
   ],
-  safetyRating: 'safe',
+  safetyRating: "safe",
   rating: 4.5,
   reviews: 142,
-  allergens: ['Fragrance'],
-  skinTypes: ['Normal', 'Dry', 'Combination']
-};
+  allergens: ["Fragrance"],
+  skinTypes: ["Normal", "Dry", "Combination"],
+}
 
 const recentScans = [
-  { id: '1', name: 'Vitamin C Serum', brand: 'Glow Botanics', safety: 'safe', image: 'https://images.unsplash.com/photo-1715750968540-841103c78d47?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxza2luY2FyZSUyMHNlcnVtJTIwZHJvcHBlcnxlbnwxfHx8fDE3NTk4MTA2NTh8MA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral' },
-  { id: '2', name: 'Retinol Night Cream', brand: 'Pure Beauty', safety: 'caution', image: 'https://images.unsplash.com/photo-1686121522357-48dc9ea59281?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxza2luY2FyZSUyMGNvc21ldGljJTIwcHJvZHVjdCUyMGJvdHRsZXxlbnwxfHx8fDE3NTk4MTA2NTV8MA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral' },
-];
+  {
+    id: "1",
+    name: "Vitamin C Serum",
+    brand: "Glow Botanics",
+    safety: "safe",
+    image:
+      "https://images.unsplash.com/photo-1715750968540-841103c78d47?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxza2luY2FyZSUyMHNlcnVtJTIwZHJvcHBlcnxlbnwxfHx8fDE3NTk4MTA2NTh8MA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral",
+  },
+  {
+    id: "2",
+    name: "Retinol Night Cream",
+    brand: "Pure Beauty",
+    safety: "caution",
+    image:
+      "https://images.unsplash.com/photo-1686121522357-48dc9ea59281?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxza2luY2FyZSUyMGNvc21ldGljJTIwcHJvZHVjdCUyMGJvdHRsZXxlbnwxfHx8fDE3NTk4MTA2NTV8MA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral",
+  },
+]
 
 export function HomeScreen({ onProductScanned, onNavigate, skinProfile }: HomeScreenProps) {
-  const handleScanProduct = () => {
-    // Simulate scanning and finding a product
-    onProductScanned(mockProduct);
-    onNavigate('analysis');
-  };
+  const [isScanning, setIsScanning] = useState(false)
+  const [uploadProgress, setUploadProgress] = useState(0)
+  const [scanError, setScanError] = useState<string | null>(null)
+  const { userId, isLoading } = useAuth()
+  const cameraInputRef = useRef<HTMLInputElement>(null)
+  const uploadInputRef = useRef<HTMLInputElement>(null)
+
+  const handleScanProduct = async () => {
+    console.log("[v0] Starting camera scan")
+    setIsScanning(true)
+    setScanError(null)
+    // Simulate opening camera
+    setTimeout(() => {
+      cameraInputRef.current?.click()
+      setIsScanning(false)
+    }, 500)
+  }
+
+  const handleImageCapture = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file || !userId) {
+      setScanError("Please wait while your profile is loading...")
+      return
+    }
+
+    console.log("[v0] Processing uploaded image:", file.name)
+    console.log("[v0] User ID:", userId)
+    setIsScanning(true)
+    setScanError(null)
+
+    try {
+      // Simulate progress
+      for (let i = 0; i <= 30; i += 10) {
+        setUploadProgress(i)
+        await new Promise((resolve) => setTimeout(resolve, 200))
+      }
+
+      setUploadProgress(50)
+      const analysis = await analyzeProductImage(file, userId)
+      setUploadProgress(75)
+
+      console.log("[v0] Gemini analysis received:", analysis)
+
+      const analyzedProduct: Product = {
+        id: `analyzed-${Date.now()}`,
+        name: analysis.productName || "Unknown Product",
+        brand: analysis.brand || "Unknown Brand",
+        image: "/skincare-product.jpg",
+        ingredients: analysis.ingredients.map((name, index) => ({
+          name,
+          purpose: "Active ingredient",
+          safety: "safe" as const,
+          description: `Ingredient identified from product label`,
+          concentration: undefined,
+        })),
+        safetyRating: analysis.safetyRating.toLowerCase() as "safe" | "caution" | "harmful",
+        rating: 4.0,
+        reviews: 0,
+        allergens: analysis.allergens,
+        skinTypes: skinProfile?.skinType ? [skinProfile.skinType] : [],
+      }
+
+      setUploadProgress(100)
+
+      sessionStorage.setItem(
+        "lastAnalysis",
+        JSON.stringify({
+          product: analyzedProduct,
+          recommendation: analysis.recommendation,
+          usageInstructions: analysis.usageInstructions,
+        }),
+      )
+
+      onProductScanned(analyzedProduct)
+      onNavigate("analysis")
+    } catch (error) {
+      console.error("[v0] Error analyzing image:", error)
+      const errorMessage =
+        error instanceof Error
+          ? error.message
+          : "Failed to analyze image. Please try again with a clearer product photo."
+      setScanError(errorMessage)
+      setIsScanning(false)
+    } finally {
+      setUploadProgress(0)
+    }
+  }
 
   const getSafetyColor = (safety: string) => {
     switch (safety) {
-      case 'safe': return 'text-green-600 bg-green-50';
-      case 'caution': return 'text-yellow-600 bg-yellow-50';
-      case 'harmful': return 'text-red-600 bg-red-50';
-      default: return 'text-gray-600 bg-gray-50';
+      case "safe":
+        return "text-green-600 bg-green-50"
+      case "caution":
+        return "text-yellow-600 bg-yellow-50"
+      case "harmful":
+        return "text-red-600 bg-red-50"
+      default:
+        return "text-gray-600 bg-gray-50"
     }
-  };
+  }
 
   return (
     <div className="space-y-8">
@@ -64,11 +175,13 @@ export function HomeScreen({ onProductScanned, onNavigate, skinProfile }: HomeSc
           />
           <div className="absolute inset-0 bg-gradient-to-br from-pink-100/90 to-rose-100/90"></div>
         </div>
-        
+
         <div className="relative z-10 grid md:grid-cols-2 gap-8 items-center">
           <div className="text-center md:text-left space-y-6">
             <div className="flex justify-center md:justify-start mb-6">
-              <img src={logoImage} alt="Skinfo Logo" className="h-16 w-auto" />
+              <div className="text-3xl font-bold bg-gradient-to-r from-pink-600 to-rose-600 bg-clip-text text-transparent">
+                SK INFO
+              </div>
             </div>
             <h1 className="text-4xl md:text-5xl bg-gradient-to-r from-pink-600 to-rose-600 bg-clip-text text-transparent mb-4">
               Know Your Ingredients,
@@ -102,8 +215,8 @@ export function HomeScreen({ onProductScanned, onNavigate, skinProfile }: HomeSc
                 <p className="text-pink-600">Get personalized product analysis based on your skin type and concerns</p>
               </div>
             </div>
-            <Button 
-              onClick={() => onNavigate('quiz')}
+            <Button
+              onClick={() => onNavigate("quiz")}
               className="bg-gradient-to-r from-pink-500 to-rose-500 hover:from-pink-600 hover:to-rose-600 text-white"
             >
               Start Quiz
@@ -121,17 +234,15 @@ export function HomeScreen({ onProductScanned, onNavigate, skinProfile }: HomeSc
               <div>
                 <h3 className="text-lg text-pink-800">Your Skin Profile</h3>
                 <div className="flex items-center space-x-2 mt-1">
-                  <Badge className="bg-pink-100 text-pink-700 border-pink-300 capitalize">
-                    {skinProfile.skinType}
-                  </Badge>
+                  <Badge className="bg-pink-100 text-pink-700 border-pink-300 capitalize">{skinProfile.skinType}</Badge>
                   <Badge className="bg-rose-100 text-rose-700 border-rose-300">
                     {skinProfile.concerns.length} concerns
                   </Badge>
                 </div>
               </div>
             </div>
-            <Button 
-              onClick={() => onNavigate('quiz')}
+            <Button
+              onClick={() => onNavigate("quiz")}
               variant="outline"
               className="border-pink-300 text-pink-700 hover:bg-pink-50"
             >
@@ -143,22 +254,54 @@ export function HomeScreen({ onProductScanned, onNavigate, skinProfile }: HomeSc
 
       {/* Main Action Buttons */}
       <div className="flex flex-col sm:flex-row gap-4 justify-center max-w-md mx-auto">
-        <Button 
+        <Button
           onClick={handleScanProduct}
-          className="h-14 bg-gradient-to-r from-pink-500 to-rose-500 hover:from-pink-600 hover:to-rose-600 text-white rounded-2xl flex items-center justify-center space-x-3 shadow-lg px-8"
+          disabled={isScanning || isLoading}
+          className="h-14 bg-gradient-to-r from-pink-500 to-rose-500 hover:from-pink-600 hover:to-rose-600 text-white rounded-2xl flex items-center justify-center space-x-3 shadow-lg px-8 disabled:opacity-50"
         >
           <Camera className="w-6 h-6" />
-          <span className="text-lg">Scan Product</span>
+          <span className="text-lg">{isLoading ? "Loading..." : isScanning ? "Scanning..." : "Scan Product"}</span>
         </Button>
-        
-        <Button 
+
+        <Button
+          onClick={() => uploadInputRef.current?.click()}
+          disabled={isScanning || isLoading}
           variant="outline"
-          className="h-14 border-2 border-pink-200 text-pink-700 rounded-2xl flex items-center justify-center space-x-3 hover:bg-pink-50 px-8"
+          className="h-14 border-2 border-pink-200 text-pink-700 rounded-2xl flex items-center justify-center space-x-3 hover:bg-pink-50 px-8 bg-transparent disabled:opacity-50"
         >
           <Upload className="w-5 h-5" />
-          <span>Upload Image</span>
+          <span>{isLoading ? "Loading..." : isScanning ? `${uploadProgress}%` : "Upload Image"}</span>
         </Button>
+
+        {/* Hidden file inputs */}
+        <input
+          ref={cameraInputRef}
+          type="file"
+          accept="image/*"
+          capture="environment"
+          onChange={handleImageCapture}
+          className="hidden"
+        />
+        <input ref={uploadInputRef} type="file" accept="image/*" onChange={handleImageCapture} className="hidden" />
       </div>
+
+      {isScanning && (
+        <div className="max-w-md mx-auto p-4 bg-blue-50 border border-blue-200 rounded-lg text-center">
+          <p className="text-blue-700 text-sm">
+            {uploadProgress > 0 && uploadProgress < 50
+              ? `Uploading... ${uploadProgress}%`
+              : uploadProgress >= 50 && uploadProgress < 100
+                ? "Analyzing with AI..."
+                : "Processing image..."}
+          </p>
+        </div>
+      )}
+
+      {scanError && (
+        <div className="max-w-md mx-auto p-4 bg-red-50 border border-red-200 rounded-lg">
+          <p className="text-red-700 text-sm">{scanError}</p>
+        </div>
+      )}
 
       {/* Quick Stats */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-4xl mx-auto">
@@ -182,13 +325,18 @@ export function HomeScreen({ onProductScanned, onNavigate, skinProfile }: HomeSc
       {/* Recent Scans */}
       {recentScans.length > 0 && (
         <div className="max-w-4xl mx-auto space-y-4">
-          <h3 className="text-2xl text-center bg-gradient-to-r from-pink-600 to-rose-600 bg-clip-text text-transparent">Recent Scans</h3>
+          <h3 className="text-2xl text-center bg-gradient-to-r from-pink-600 to-rose-600 bg-clip-text text-transparent">
+            Recent Scans
+          </h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {recentScans.map((product) => (
-              <Card key={product.id} className="p-4 bg-white/70 border-pink-100 hover:shadow-lg transition-shadow cursor-pointer">
+              <Card
+                key={product.id}
+                className="p-4 bg-white/70 border-pink-100 hover:shadow-lg transition-shadow cursor-pointer"
+              >
                 <div className="flex items-center space-x-4">
                   <ImageWithFallback
-                    src={product.image}
+                    src={product.image || "/placeholder.svg"}
                     alt={product.name}
                     className="w-16 h-16 rounded-xl object-cover"
                   />
@@ -244,9 +392,11 @@ export function HomeScreen({ onProductScanned, onNavigate, skinProfile }: HomeSc
             <Shield className="w-6 h-6 text-pink-600" />
           </div>
           <h3 className="text-lg mb-2 text-pink-800">Safety First</h3>
-          <p className="text-gray-600 text-sm">Comprehensive safety ratings and allergen warnings for informed choices</p>
+          <p className="text-gray-600 text-sm">
+            Comprehensive safety ratings and allergen warnings for informed choices
+          </p>
         </Card>
       </div>
     </div>
-  );
+  )
 }
