@@ -1,3 +1,7 @@
-import App from "../src/App"
+"use client"
 
-export default App
+import App from "./App"
+
+export default function Page() {
+  return <App />
+}
