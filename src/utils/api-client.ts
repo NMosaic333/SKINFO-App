@@ -37,7 +37,7 @@ export async function analyzeProductImage(image: File, userId: string): Promise<
 
   const result = await response.json()
 
-  const analysis = result as AnalysisResult
+  const analysis = result.analysis as AnalysisResult
 
   // ✅ Save the analysis to sessionStorage for later use
   try {
@@ -55,7 +55,6 @@ export async function analyzeProductImage(image: File, userId: string): Promise<
         usageInstructions: analysis.usageInstructions,
       })
     )
-    console.log("✅ Saved analysis to sessionStorage:", analysis)
   } catch (error) {
     console.error("❌ Failed to save analysis to sessionStorage:", error)
   }

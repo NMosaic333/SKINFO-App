@@ -1,3 +1,5 @@
+"use client";
+
 import React, { useState, useEffect, useMemo } from "react";
 import {
   ArrowLeft,
@@ -15,14 +17,13 @@ import {
 import { Button } from "./ui/button";
 import { Card } from "./ui/card";
 import { Badge } from "./ui/badge";
+import { Collapsible, CollapsibleTrigger, CollapsibleContent } from "./ui/collapsible";
 import { ImageWithFallback } from "./figma/ImageWithFallback";
-import { getLastAnalysis, formatRecommendation } from "../utils/gemini-analysis";
+import { getLastAnalysis, formatRecommendation, GeminiAnalysisData } from "../utils/gemini-analysis";
 import { getIngredientDetails, IngredientInfo } from "../utils/ingredients";
-import type { GeminiAnalysisData } from "../utils/gemini-analysis";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "./ui/collapsible";
 import type { Product, Screen, Ingredient, SkinProfile } from "../App";
 
-// --- Ingredient Card ---
+// ------------------- Ingredient Card -------------------
 function IngredientCard({ ingredient }: { ingredient: Ingredient }) {
   const [isOpen, setIsOpen] = useState(false);
   const [dataset, setDataset] = useState<IngredientInfo>({
@@ -32,17 +33,17 @@ function IngredientCard({ ingredient }: { ingredient: Ingredient }) {
   });
 
   useEffect(() => {
-    let mounted = true;
+    let active = true;
     (async () => {
       try {
-        const det = await getIngredientDetails(ingredient.name);
-        if (mounted && det) setDataset(det);
-      } catch {
-        // silently ignore
+        const data = await getIngredientDetails(ingredient.name);
+        if (active && data) setDataset(data);
+      } catch (err) {
+        console.warn("Failed to fetch ingredient details:", err);
       }
     })();
     return () => {
-      mounted = false;
+      active = false;
     };
   }, [ingredient.name]);
 
@@ -58,54 +59,60 @@ function IngredientCard({ ingredient }: { ingredient: Ingredient }) {
     harmful: "border-red-200",
   };
 
+  const safetyLabel = {
+    safe: "Generally safe for most skin types",
+    caution: "May cause irritation in sensitive individuals",
+    harmful: "Potentially harmful — consult a dermatologist",
+  };
+
   return (
     <Collapsible open={isOpen} onOpenChange={setIsOpen}>
-      <Card className={`p-4 ${borders[ingredient.safety ?? "safe"]}`}>
-        <CollapsibleTrigger className="w-full">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-3">
-              {icons[ingredient.safety ?? "safe"]}
-              <div className="text-left">
-                <h4 className="text-sm font-medium">{ingredient.name}</h4>
-                <p className="text-xs text-gray-500">{ingredient.purpose}</p>
+      <Card className={`p-4 transition-all ${borders[ingredient.safety ?? "safe"]}`}>
+        <CollapsibleTrigger asChild>
+          <button className="w-full text-left">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-3">
+                {icons[ingredient.safety ?? "safe"]}
+                <div>
+                  <h4 className="text-sm font-medium">{ingredient.name}</h4>
+                  <p className="text-xs text-gray-500">{ingredient.purpose}</p>
+                </div>
+              </div>
+              <div className="flex items-center space-x-2">
+                {ingredient.concentration && (
+                  <Badge variant="outline" className="text-xs">
+                    {ingredient.concentration}
+                  </Badge>
+                )}
+                {isOpen ? (
+                  <ChevronUp className="w-4 h-4" />
+                ) : (
+                  <ChevronDown className="w-4 h-4" />
+                )}
               </div>
             </div>
-            <div className="flex items-center space-x-2">
-              {ingredient.concentration && (
-                <Badge variant="outline" className="text-xs">
-                  {ingredient.concentration}
-                </Badge>
-              )}
-              {isOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-            </div>
-          </div>
+          </button>
         </CollapsibleTrigger>
 
-        <CollapsibleContent className="mt-3">
-          <div className="pl-8 space-y-2">
-            <p className="text-sm text-gray-600">
-              {dataset?.short_description || ingredient.description}
+        <CollapsibleContent className="mt-3 pl-8 space-y-2">
+          <p className="text-sm text-gray-600">
+            {dataset?.short_description || ingredient.description || "No description available."}
+          </p>
+          {dataset?.what_does_it_do && (
+            <p className="text-sm text-gray-600 mt-2">{dataset.what_does_it_do}</p>
+          )}
+          {dataset?.url && (
+            <p className="text-xs text-blue-600 mt-2">
+              <a href={dataset.url} target="_blank" rel="noreferrer">
+                Learn more about this ingredient
+              </a>
             </p>
-            {dataset?.what_does_it_do && (
-              <p className="text-sm text-gray-600 mt-2">{dataset.what_does_it_do}</p>
-            )}
-            {dataset?.url && (
-              <p className="text-xs text-blue-600 mt-2">
-                <a href={dataset.url} target="_blank" rel="noreferrer">
-                  More on this ingredient
-                </a>
-              </p>
-            )}
-            <div className="flex items-center space-x-2">
-              <Info className="w-4 h-4 text-blue-500" />
-              <span className="text-xs text-blue-600">
-                {ingredient.safety === "safe" && "Generally safe for most skin types"}
-                {ingredient.safety === "caution" &&
-                  "May cause irritation in sensitive individuals"}
-                {ingredient.safety === "harmful" &&
-                  "Potentially harmful - consult a dermatologist"}
-              </span>
-            </div>
+          )}
+          <div className="flex items-center space-x-2">
+            <Info className="w-4 h-4 text-blue-500" />
+            <span className="text-xs text-blue-600">
+              {safetyLabel[ingredient.safety ?? "safe"]}
+            </span>
           </div>
         </CollapsibleContent>
       </Card>
@@ -113,25 +120,27 @@ function IngredientCard({ ingredient }: { ingredient: Ingredient }) {
   );
 }
 
-// --- Main Component ---
-export function AnalysisScreen({
-  product,
-  onNavigate,
-  skinProfile,
-}: AnalysisScreenProps) {
+// ------------------- Analysis Screen -------------------
+interface AnalysisScreenProps {
+  product?: Product | null;
+  onNavigate: (screen: Screen) => void;
+  skinProfile?: SkinProfile | null;
+}
+
+export function AnalysisScreen({ product, onNavigate, skinProfile }: AnalysisScreenProps) {
   const [analysisData, setAnalysisData] = useState<GeminiAnalysisData | null>(null);
 
   useEffect(() => {
     try {
       const data = getLastAnalysis();
       if (data) setAnalysisData(data);
-    } catch {
-      // ignore storage errors
+    } catch (err) {
+      console.error("Failed to load analysis:", err);
     }
   }, []);
 
-  // ✅ Safe fallback product
-  const displayedProduct: Product = useMemo(
+  // Safe fallback product
+  const displayedProduct = useMemo<Product>(
     () =>
       product ??
       (analysisData?.product as Product) ?? {
@@ -148,61 +157,58 @@ export function AnalysisScreen({
     [product, analysisData]
   );
 
-  // ✅ Avoid undefined filter errors
   const ingredients = Array.isArray(displayedProduct.ingredients)
     ? displayedProduct.ingredients
     : [];
 
-  const safeIngredients = ingredients.filter((i) => i.safety === "safe").length;
-  const cautionIngredients = ingredients.filter((i) => i.safety === "caution").length;
-  const harmfulIngredients = ingredients.filter((i) => i.safety === "harmful").length;
+  // Count safety categories
+  const safeCount = ingredients.filter((i) => i.safety === "safe").length;
+  const cautionCount = ingredients.filter((i) => i.safety === "caution").length;
+  const harmfulCount = ingredients.filter((i) => i.safety === "harmful").length;
 
   const safetyMap = {
-    SAFE: {
+    safe: {
       color: "bg-emerald-50 text-emerald-700 border-emerald-200",
       icon: <CheckCircle className="w-6 h-6 text-emerald-500" />,
-      desc: "This product is generally safe for most users",
+      desc: "This product is generally safe for most users.",
     },
-    CAUTION: {
+    caution: {
       color: "bg-amber-50 text-amber-700 border-amber-200",
       icon: <AlertTriangle className="w-6 h-6 text-amber-500" />,
-      desc: "Use with caution - may contain irritating ingredients",
+      desc: "Use with caution — may contain irritating ingredients.",
     },
-    HARMFUL: {
+    harmful: {
       color: "bg-red-50 text-red-700 border-red-200",
       icon: <XCircle className="w-6 h-6 text-red-500" />,
-      desc: "Not recommended - contains harmful ingredients",
+      desc: "Not recommended — contains harmful ingredients.",
     },
   };
 
+  // Personalized recommendations
   const getPersonalizedRecommendation = (): { concerns: string[]; benefits: string[] } => {
-    if (!skinProfile)
-      return { concerns: [], benefits: [] };
+    if (!skinProfile) return { concerns: [], benefits: [] };
 
     const concerns: string[] = [];
     const benefits: string[] = [];
 
     if (skinProfile.skinType === "sensitive" && displayedProduct.allergens?.length > 0)
-      concerns.push("May irritate sensitive skin due to allergens");
+      concerns.push("May irritate sensitive skin due to allergens.");
 
-    if (
-      skinProfile.skinType === "oily" &&
-      displayedProduct.name.toLowerCase().includes("oil")
-    )
-      concerns.push("Oil-based product might be heavy for oily skin");
+    if (skinProfile.skinType === "oily" && displayedProduct.name.toLowerCase().includes("oil"))
+      concerns.push("Oil-based product might be heavy for oily skin.");
 
     if (
       skinProfile.skinType === "dry" &&
       ingredients.some((i) => i.name.toLowerCase().includes("hyaluronic"))
     )
-      benefits.push("Contains hyaluronic acid — great for hydration");
+      benefits.push("Contains hyaluronic acid — great for hydration.");
 
     const hasSensitivity = skinProfile.sensitivities?.some((s) =>
       displayedProduct.allergens?.some((a) =>
         a.toLowerCase().includes(s.toLowerCase())
       )
     );
-    if (hasSensitivity) concerns.push("Contains potential sensitivities");
+    if (hasSensitivity) concerns.push("Contains potential sensitivities.");
 
     if (
       skinProfile.concerns.includes("acne") &&
@@ -210,7 +216,7 @@ export function AnalysisScreen({
         ["salicylic", "niacinamide"].some((k) => i.name.toLowerCase().includes(k))
       )
     )
-      benefits.push("Contains acne-fighting ingredients");
+      benefits.push("Contains acne-fighting ingredients.");
 
     if (
       skinProfile.concerns.includes("aging") &&
@@ -218,22 +224,12 @@ export function AnalysisScreen({
         ["vitamin c", "retinol"].some((k) => i.name.toLowerCase().includes(k))
       )
     )
-      benefits.push("Contains anti-aging ingredients");
+      benefits.push("Contains anti-aging ingredients.");
 
     return { concerns, benefits };
   };
 
   const personalized = getPersonalizedRecommendation();
-
-  useEffect(() => {
-    try {
-      const data = getLastAnalysis();
-      console.log("🔍 Analysis data from storage:", data); // 👈 Add this
-      if (data) setAnalysisData(data);
-    } catch (err) {
-      console.error("Failed to load analysis:", err);
-    }
-  }, []);
 
   return (
     <div className="space-y-8 max-w-6xl mx-auto">
@@ -252,6 +248,7 @@ export function AnalysisScreen({
             Ingredient Analysis
           </h1>
         </div>
+
         <Button
           onClick={() => onNavigate("comparison")}
           className="bg-gradient-to-r from-pink-500 to-rose-500 hover:from-pink-600 hover:to-rose-600 text-white"
@@ -260,40 +257,49 @@ export function AnalysisScreen({
         </Button>
       </div>
 
-      {/* Recommendation */}
+      {/* Recommendation Section */}
       {analysisData?.recommendation && (
-        <Card className="p-8 rounded-2xl bg-gradient-to-r from-pink-500 to-rose-500 text-white shadow-xl">
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6">
-            <div className="max-w-3xl">
-              <h2 className="text-3xl md:text-4xl font-extrabold mb-3">
-                Recommended for you
-              </h2>
-              {formatRecommendation(analysisData.recommendation)
-                .split("\n")
-                .map((line, idx) => (
-                  <p key={idx} className="text-base md:text-lg leading-relaxed text-white/90">
-                    {line}
-                  </p>
-                ))}
-            </div>
+      <Card className="p-8 rounded-2xl bg-white/90 backdrop-blur-md border border-rose-100 shadow-[0_4px_20px_rgba(0,0,0,0.05)]">
+        <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-8">
+          {/* Left: Recommendation */}
+          <div className="max-w-3xl">
+            <h2 className="text-3xl md:text-4xl font-semibold mb-4 text-rose-600">
+              Recommended for you
+            </h2>
 
-            {analysisData.usageInstructions && (
-              <div className="min-w-[220px] bg-white/10 p-4 rounded-lg">
-                <h4 className="font-semibold text-white">How to use:</h4>
-                <div className="mt-2 text-white/90 text-sm space-y-1">
-                  {analysisData.usageInstructions.split("\n").map((line, idx) => (
-                    <p key={idx}>{line}</p>
-                  ))}
-                </div>
-              </div>
-            )}
+            {formatRecommendation(analysisData.recommendation)
+              .split("\n")
+              .map((line, idx) => (
+                <p
+                  key={idx}
+                  className="text-base md:text-lg leading-relaxed text-gray-700"
+                >
+                  {line}
+                </p>
+              ))}
           </div>
-        </Card>
+
+          {/* Right: Usage Instructions */}
+          {analysisData.usageInstructions && (
+            <div className="min-w-[240px] bg-gradient-to-b from-rose-50 to-white border border-rose-100 p-5 rounded-xl shadow-inner">
+              <h4 className="font-medium text-rose-600 mb-2">How to use</h4>
+              <div className="text-sm space-y-2 text-gray-700">
+                {analysisData.usageInstructions.split("\n").map((line, idx) => (
+                  <p key={idx}>{line}</p>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      </Card>
+
       )}
 
+      {/* Main Layout */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Left Column */}
         <div className="lg:col-span-1 space-y-6">
+          {/* Product Info */}
           <Card className="p-6 bg-white/70 border-pink-100">
             <ImageWithFallback
               src={displayedProduct.image}
@@ -342,12 +348,11 @@ export function AnalysisScreen({
                 </>
               )}
 
-              {personalized.benefits.length === 0 &&
-                personalized.concerns.length === 0 && (
-                  <p className="text-sm text-pink-700">
-                    This product appears neutral for your skin profile.
-                  </p>
-                )}
+              {personalized.benefits.length === 0 && personalized.concerns.length === 0 && (
+                <p className="text-sm text-pink-700">
+                  This product appears neutral for your skin profile.
+                </p>
+              )}
             </Card>
           )}
 
@@ -368,19 +373,19 @@ export function AnalysisScreen({
             <div className="grid grid-cols-3 gap-4 mt-6 text-center">
               <div>
                 <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-2">
-                  <span className="text-lg text-green-600">{safeIngredients}</span>
+                  <span className="text-lg text-green-600">{safeCount}</span>
                 </div>
                 <p className="text-sm text-green-600">Safe</p>
               </div>
               <div>
                 <div className="w-12 h-12 bg-yellow-100 rounded-full flex items-center justify-center mx-auto mb-2">
-                  <span className="text-lg text-yellow-600">{cautionIngredients}</span>
+                  <span className="text-lg text-yellow-600">{cautionCount}</span>
                 </div>
                 <p className="text-sm text-yellow-600">Caution</p>
               </div>
               <div>
                 <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-2">
-                  <span className="text-lg text-red-600">{harmfulIngredients}</span>
+                  <span className="text-lg text-red-600">{harmfulCount}</span>
                 </div>
                 <p className="text-sm text-red-600">Harmful</p>
               </div>
@@ -401,7 +406,7 @@ export function AnalysisScreen({
             </Card>
           )}
 
-          {/* Suitable Skin Types */}
+          {/* Skin Types */}
           <Card className="p-6 bg-pink-50 border-pink-200">
             <h3 className="text-lg mb-3 text-pink-800">✅ Suitable for</h3>
             <div className="flex flex-wrap gap-2">
@@ -421,7 +426,7 @@ export function AnalysisScreen({
               <div>
                 <h2 className="text-2xl text-gray-800 mb-2">Ingredients Breakdown</h2>
                 <p className="text-sm text-gray-600">
-                  Detailed analysis of each ingredient and its effects on your skin
+                  Detailed analysis of each ingredient and its effects on your skin.
                 </p>
               </div>
               <ImageWithFallback
@@ -434,7 +439,7 @@ export function AnalysisScreen({
 
           <div className="space-y-4">
             {ingredients.length > 0 ? (
-              ingredients.map((ing, i) => <IngredientCard key={i} ingredient={ing} />)
+              ingredients.map((ing, idx) => <IngredientCard key={idx} ingredient={ing} />)
             ) : (
               <p className="text-gray-500 text-sm text-center py-8">
                 No ingredient data available for this product.

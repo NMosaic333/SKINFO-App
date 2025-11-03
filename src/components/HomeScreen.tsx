@@ -30,68 +30,104 @@ export function HomeScreen({ onProductScanned, onNavigate, skinProfile }: HomeSc
 
   const processFile = async (file: File) => {
     if (isLoading) return alert("Please wait, loading your account...");
-    console.log("Auth state:", { userId, isLoading })
+    console.log("Auth state:", { userId, isLoading });
     if (!userId) return alert("You must be logged in to upload.");
-    if (!file) return
+    if (!file) return;
 
-    setPreviewSrc(URL.createObjectURL(file))
-    setScanError(null)
-    setIsScanning(true)
-    setProgress(0)
-    setAnalysisTime(null)
+    setPreviewSrc(URL.createObjectURL(file));
+    setScanError(null);
+    setIsScanning(true);
+    setProgress(10);
+    setAnalysisTime(null);
 
     try {
-      const reader = new FileReader()
+      const reader = new FileReader();
 
-      reader.onprogress = (e) => {
-        if (e.lengthComputable) {
-          const percent = Math.round((e.loaded / e.total) * 100)
-          setProgress(percent)
-        }
-      }
+      // Simulate progress (FileReader progress is unreliable for small files)
+      const simulateProgress = () => {
+        let current = 10;
+        const interval = setInterval(() => {
+          current += 10;
+          setProgress(Math.min(current, 90));
+          if (current >= 90) clearInterval(interval);
+        }, 200);
+      };
+      simulateProgress();
 
       reader.onloadend = async () => {
-        setProgress(100)
-        const start = performance.now()
+        const start = performance.now();
 
-        const analysis = await analyzeProductImage(file, userId)
+        try {
+          const analysis = await analyzeProductImage(file, userId);
+          console.log("AI analysis result:", analysis);
 
-        const end = performance.now()
-        const duration = ((end - start) / 1000).toFixed(2)
-        setAnalysisTime(Number(duration))
+          const end = performance.now();
+          const duration = ((end - start) / 1000).toFixed(2);
+          setAnalysisTime(Number(duration));
+          setProgress(100);
 
-        const analyzedProduct: Product = {
-          id: `p-${Date.now()}`,
-          name: "Unknown Product",
-          brand: "Unknown Brand",
-          image: previewSrc!,
-          ingredients: ingredients.map((n: string) => ({
-            name: n,
-            purpose: "Active ingredient",
-            safety: "safe",
-            description: "Detected ingredient from label",
-          })),
-          safetyRating: "safe",
-          rating: 4,
-          reviews: 0,
-          allergens: allergens,
-          skinTypes: skinProfile?.skinType ? [skinProfile.skinType] : [],
-          recommendations: recommendations,
-          usageInstructions: usage,
+          // Safely extract data
+          const {
+            productName = "Unknown Product",
+            brand = "Unknown Brand",
+            ingredients = [],
+            safetyRating = "SAFE",
+            recommendation = "No recommendation available.",
+            allergens = [],
+            usageInstructions = "No usage instructions provided.",
+          } = analysis || {};
+
+          const analyzedProduct: Product = {
+            id: `p-${Date.now()}`,
+            name: productName,
+            brand,
+            image: previewSrc!,
+            ingredients: ingredients.map((n: string) => ({
+              name: n,
+              purpose: "Active ingredient",
+              safety: safetyRating.toLowerCase(),
+              description: "Detected ingredient from label",
+            })),
+            safetyRating: safetyRating.toLowerCase(),
+            rating: 4,
+            reviews: 0,
+            allergens,
+            skinTypes: skinProfile?.skinType ? [skinProfile.skinType] : [],
+            recommendations: recommendation,
+            usageInstructions,
+          };
+
+          // Save to session storage
+          sessionStorage.setItem(
+            "lastAnalysis",
+            JSON.stringify({
+              product: analyzedProduct,
+              recommendation,
+              usageInstructions,
+            })
+          );
+
+          // Smooth transition to analysis page
+          setTimeout(() => {
+            onProductScanned(analyzedProduct);
+            onNavigate("analysis");
+          }, 700);
+        } catch (err) {
+          console.error("AI analysis failed:", err);
+          setScanError("Failed to analyze image. Please try again.");
+        } finally {
+          setIsScanning(false);
         }
+      };
 
-        onProductScanned(analyzedProduct)
-        onNavigate("analysis")
-      }
-
-      reader.readAsDataURL(file)
+      reader.readAsDataURL(file);
     } catch (err) {
-      console.error("Image analysis failed:", err)
-      setScanError("Failed to analyze image.")
-    } finally {
-      setIsScanning(false)
+      console.error("Unexpected error:", err);
+      setScanError("Something went wrong while analyzing.");
+      setIsScanning(false);
     }
-  }
+  };
+
 
   const handleImageCapture = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
