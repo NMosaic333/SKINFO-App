@@ -36,7 +36,31 @@ export async function analyzeProductImage(image: File, userId: string): Promise<
   }
 
   const result = await response.json()
-  return result.analysis
+
+  const analysis = result as AnalysisResult
+
+  // ✅ Save the analysis to sessionStorage for later use
+  try {
+    sessionStorage.setItem(
+      "lastAnalysis",
+      JSON.stringify({
+        product: {
+          productName: analysis.productName,
+          brand: analysis.brand,
+          ingredients: analysis.ingredients,
+          safetyRating: analysis.safetyRating,
+          allergens: analysis.allergens,
+        },
+        recommendation: analysis.recommendation,
+        usageInstructions: analysis.usageInstructions,
+      })
+    )
+    console.log("✅ Saved analysis to sessionStorage:", analysis)
+  } catch (error) {
+    console.error("❌ Failed to save analysis to sessionStorage:", error)
+  }
+
+  return analysis
 }
 
 /**

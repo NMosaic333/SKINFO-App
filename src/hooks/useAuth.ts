@@ -1,38 +1,32 @@
 "use client"
-
 import { useEffect, useState } from "react"
+import { supabase } from "@/lib/supabaseClient"
+import type { User } from "@supabase/supabase-js"
 
 export function useAuth() {
-  const [userId, setUserId] = useState<string | null>(null)
+  const [user, setUser] = useState<User | null>(null)
   const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
-    const fetchUser = async () => {
-      try {
-        // Try to get user from Supabase auth
-        // In a real app with Supabase, this would fetch the actual user
-        // For now, generate a consistent demo user ID
-        const storedId = localStorage.getItem("userId")
-        if (storedId) {
-          setUserId(storedId)
-        } else {
-          // Generate a demo user ID for testing
-          const demoId = `demo-user-${Date.now()}`
-          localStorage.setItem("userId", demoId)
-          setUserId(demoId)
-        }
-      } catch (error) {
-        console.error("[v0] Error fetching user:", error)
-        // Use demo user if error
-        const demoId = `demo-user-${Date.now()}`
-        setUserId(demoId)
-      } finally {
-        setIsLoading(false)
-      }
+    // ✅ Get the current session from local storage
+    const fetchSession = async () => {
+      const { data, error } = await supabase.auth.getSession()
+      if (error) console.error("Session error:", error)
+      setUser(data.session?.user ?? null)
+      setIsLoading(false)
     }
 
-    fetchUser()
+    fetchSession()
+
+    // ✅ Listen for login/logout state changes
+    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null)
+    })
+
+    return () => {
+      listener.subscription.unsubscribe()
+    }
   }, [])
 
-  return { userId, isLoading }
+  return { user, isLoading }
 }

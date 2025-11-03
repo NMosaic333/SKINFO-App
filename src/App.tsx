@@ -11,6 +11,7 @@ import { BottomNavigation } from "./components/BottomNavigation"
 import Footer from "./components/ui/footer"
 import { LoginScreen } from "./components/LoginScreen"
 import { RegisterScreen } from "./components/RegisterScreen"
+import { supabase } from "@/lib/supabaseClient";
 
 export type Screen = "home" | "analysis" | "comparison" | "reviews" | "profile" | "quiz" | "login"
 
@@ -86,14 +87,30 @@ export default function App() {
       case "login":
         return <LoginScreen onNavigate={setCurrentScreen} onLogin={(user) => setUser(user)} />
       case "register":
-        return <RegisterScreen onNavigate={setCurrentScreen} />
+        return <RegisterScreen 
+        onNavigate={setCurrentScreen} 
+        onRegister={(user) => {console.log("User registered:", user)
+        setUser(user)
+  }} />
       default:
         return (
           <HomeScreen onProductScanned={setSelectedProduct} onNavigate={setCurrentScreen} skinProfile={skinProfile} />
         )
     }
   }
-  
+
+  const handleLogout = async () => {
+    try {
+      await supabase.auth.signOut();
+      setUser(null);
+      alert("Logged out successfully!");
+      setCurrentScreen("home");
+    } catch (error) {
+      console.error("Logout error:", error);
+      alert("Failed to log out.");
+    }
+  };
+
   // Navigate wrapper that offers to load the last analysis when user opens the Analysis screen
   const navigateTo = (screen: Screen) => {
     if (screen === 'analysis' && !selectedProduct) {
@@ -116,6 +133,43 @@ export default function App() {
     setCurrentScreen(screen)
   }
 
+  useEffect(() => {
+    const getSession = async () => {
+      const { data, error } = await supabase.auth.getUser();
+      if (data?.user) {
+        setUser({
+          name: data.user.user_metadata?.name || "User",
+          email: data.user.email || "",
+        });
+      } else {
+        setUser(null);
+      }
+    };
+    getSession();
+
+    // Optional: Listen to auth changes (login/logout)
+    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session?.user) {
+        setUser({
+          name: session.user.user_metadata?.name || "User",
+          email: session.user.email || "",
+        });
+      } else {
+        setUser(null);
+      }
+    });
+
+    return () => listener.subscription.unsubscribe();
+  }, []);
+
+  useEffect(() => {
+    async function fetchProfile() {
+      const res = await fetch("/api/user-profile");
+      const data = await res.json();
+      if (data.success) setSkinProfile(data.profile);
+    }
+    fetchProfile();
+  }, [user]);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-pink-50 via-rose-50 to-pink-100">
@@ -124,14 +178,8 @@ export default function App() {
         <div className="container mx-auto px-6">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-3">
-              <img src="/src/assets/logo.png" alt="SKINFO Logo" className="h-20 w-20" />
+              <img src="/assets/logo.png" alt="SKINFO Logo" className="h-20 w-20" />
             </div>
-            {user ? (
-              <span className="text-pink-600 font-medium">Hi, {user.name.split(" ")[0]}!</span>
-            ) : (
-              <></>
-            )}
-
 
             <nav className="hidden md:flex items-center space-x-8">
               <button
@@ -194,7 +242,16 @@ export default function App() {
               >
                 Profile
               </button>
-              <button
+              {user ? (
+              <div className="flex items-center space-x-3">
+                <button
+                  onClick={handleLogout}
+                  className="text-sm text-gray-600 hover:text-pink-600 underline ml-2"
+                >
+                  Logout
+                </button>
+              </div>
+            ) : <button
                 onClick={() => setCurrentScreen("login")}
                 className={`px-4 py-2 rounded-full transition-all ${
                   currentScreen === "login"
@@ -203,7 +260,7 @@ export default function App() {
                 }`}
               >
                 Login
-              </button>
+              </button>}
             </nav>
 
             {/* Mobile menu button */}

@@ -6,6 +6,7 @@ import { Badge } from './ui/badge';
 import { Progress } from './ui/progress';
 import { ImageWithFallback } from './figma/ImageWithFallback';
 import type { Screen, SkinProfile } from '../App';
+import { supabase } from "@/lib/supabaseClient"
 
 interface QuizScreenProps {
   onNavigate: (screen: Screen) => void;
@@ -153,7 +154,7 @@ export function QuizScreen({ onNavigate, onComplete }: QuizScreenProps) {
     }
   };
 
-  const completeQuiz = () => {
+  const completeQuiz = async () => {
     const profile: SkinProfile = {
       skinType: answers.skinType as string,
       concerns: answers.concerns as string[] || [],
@@ -162,8 +163,28 @@ export function QuizScreen({ onNavigate, onComplete }: QuizScreenProps) {
       routine: answers.routine as string,
       climate: answers.climate as string
     };
-    
-    // Propagate profile to parent and navigate to Profile screen so the user can view/edit it
+
+    // Save to backend
+    const { data: { user } } = await supabase.auth.getUser();
+
+    if (user) {
+      const { error } = await supabase
+        .from('profiles')
+        .upsert({
+          id: user.id,
+          email: user.email,
+          skin_type: profile.skinType,
+          skin_concerns: profile.concerns,
+          updated_at: new Date()
+        });
+
+      if (error) {
+        console.error('Error saving profile:', error);
+      } else {
+        console.log('Profile saved successfully');
+      }
+    }
+
     onComplete(profile);
     onNavigate('profile');
     setIsComplete(true);
@@ -351,6 +372,28 @@ export function QuizScreen({ onNavigate, onComplete }: QuizScreenProps) {
         </div>
       </div>
 
+      {/* Navigation */}
+      <div className="flex justify-between">
+        <Button
+          variant="outline"
+          onClick={handlePrevious}
+          disabled={currentQuestion === 0}
+          className="border-pink-300 text-pink-700 disabled:opacity-50"
+        >
+          <ArrowLeft className="w-4 h-4 mr-2" />
+          Previous
+        </Button>
+        
+        <Button
+          onClick={handleNext}
+          disabled={!canProceed()}
+          className="bg-gradient-to-r from-pink-500 to-rose-500 hover:from-pink-600 hover:to-rose-600 text-white disabled:opacity-50"
+        >
+          {currentQuestion === quizQuestions.length - 1 ? 'Complete Quiz' : 'Next'}
+          <ArrowRight className="w-4 h-4 ml-2" />
+        </Button>
+      </div>
+
       {/* Question Card */}
       <Card className="p-8 bg-white/70 border-pink-200">
         <h2 className="text-xl mb-6 text-center">{question.question}</h2>
@@ -387,28 +430,6 @@ export function QuizScreen({ onNavigate, onComplete }: QuizScreenProps) {
           })}
         </div>
       </Card>
-
-      {/* Navigation */}
-      <div className="flex justify-between">
-        <Button
-          variant="outline"
-          onClick={handlePrevious}
-          disabled={currentQuestion === 0}
-          className="border-pink-300 text-pink-700 disabled:opacity-50"
-        >
-          <ArrowLeft className="w-4 h-4 mr-2" />
-          Previous
-        </Button>
-        
-        <Button
-          onClick={handleNext}
-          disabled={!canProceed()}
-          className="bg-gradient-to-r from-pink-500 to-rose-500 hover:from-pink-600 hover:to-rose-600 text-white disabled:opacity-50"
-        >
-          {currentQuestion === quizQuestions.length - 1 ? 'Complete Quiz' : 'Next'}
-          <ArrowRight className="w-4 h-4 ml-2" />
-        </Button>
-      </div>
     </div>
   );
 }

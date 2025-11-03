@@ -1,110 +1,168 @@
-import React, { useState, useEffect } from 'react';
-import { ArrowLeft, User, Settings, Bell, Shield, Heart, Star, ChevronRight, Edit } from 'lucide-react';
-import { Button } from './ui/button';
-import { Card } from './ui/card';
-import { Badge } from './ui/badge';
-import { Switch } from './ui/switch';
-import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
-import { ImageWithFallback } from './figma/ImageWithFallback';
-import type { Screen, SkinProfile } from '../App';
+"use client";
+
+import React, { useState, useEffect } from "react";
+import { supabase } from "@/lib/supabaseClient";
+import {
+  ArrowLeft, Settings, Bell, Shield, Heart, Star, ChevronRight,
+} from "lucide-react";
+import { Button } from "./ui/button";
+import { Card } from "./ui/card";
+import { Badge } from "./ui/badge";
+import { Switch } from "./ui/switch";
+import { Avatar, AvatarFallback } from "./ui/avatar";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
+import { ImageWithFallback } from "./figma/ImageWithFallback";
+import type { Screen, SkinProfile } from "../App";
 
 interface ProfileScreenProps {
   onNavigate: (screen: Screen) => void;
-  skinProfile?: SkinProfile | null;
-  onUpdateProfile?: (profile: SkinProfile | null) => void;
 }
 
-export function ProfileScreen({ onNavigate, skinProfile, onUpdateProfile }: ProfileScreenProps) {
-  const [skinType, setSkinType] = useState<string>(skinProfile?.skinType ?? 'combination');
-  const [concerns, setConcerns] = useState<string[]>(skinProfile?.concerns ?? ['acne', 'aging']);
-  const [allergies, setAllergies] = useState<string[]>(skinProfile?.sensitivities ?? ['fragrance', 'parabens']);
+export function ProfileScreen({ onNavigate }: ProfileScreenProps) {
+  const [profile, setProfile] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
   const [notifications, setNotifications] = useState(true);
-  const [darkMode, setDarkMode] = useState(false);
-
+  // Skin type, concerns, and allergy options
   const skinTypeOptions = [
-    { value: 'oily', label: 'Oily' },
-    { value: 'dry', label: 'Dry' },
-    { value: 'combination', label: 'Combination' },
-    { value: 'sensitive', label: 'Sensitive' },
-    { value: 'normal', label: 'Normal' }
+    { value: "dry", label: "Dry" },
+    { value: "oily", label: "Oily" },
+    { value: "combination", label: "Combination" },
+    { value: "normal", label: "Normal" },
+    { value: "sensitive", label: "Sensitive" },
   ];
 
   const concernOptions = [
-    'acne', 'aging', 'hyperpigmentation', 'dryness', 'sensitivity', 'large-pores', 'dullness'
+    "acne",
+    "dark-spots",
+    "wrinkles",
+    "dullness",
+    "redness",
+    "clogged-pores",
+    "uneven-texture",
   ];
 
   const allergenOptions = [
-    'fragrance', 'parabens', 'sulfates', 'alcohol', 'retinol', 'salicylic-acid', 'glycolic-acid'
+    "fragrance",
+    "alcohol",
+    "parabens",
+    "silicones",
+    "sulfates",
+    "essential-oils",
   ];
 
+  // Functions for toggling concerns & allergies
+  function toggleConcern(c: string) {
+    setProfile((prev: any) => {
+      if (!prev) return prev;
+      const updatedConcerns = prev.concerns.includes(c)
+        ? prev.concerns.filter((x: string) => x !== c)
+        : [...prev.concerns, c];
+      updateProfile({ concerns: updatedConcerns });
+      return { ...prev, concerns: updatedConcerns };
+    });
+  }
+
+  function toggleAllergy(a: string) {
+    setProfile((prev: any) => {
+      if (!prev) return prev;
+      const updatedAllergies = prev.sensitivities.includes(a)
+        ? prev.sensitivities.filter((x: string) => x !== a)
+        : [...prev.sensitivities, a];
+      updateProfile({ sensitivities: updatedAllergies });
+      return { ...prev, sensitivities: updatedAllergies };
+    });
+  }
+
+  // Example favorites (you can later fetch this dynamically)
   const favoriteProducts = [
-    { name: 'Vitamin C Serum', brand: 'Glow Botanics', rating: 5 },
-    { name: 'Hyaluronic Acid', brand: 'Pure Beauty', rating: 4 },
-    { name: 'Niacinamide 10%', brand: 'Skin Solutions', rating: 5 }
+    { name: "Hydrating Gel Cleanser", brand: "CeraVe", rating: 5 },
+    { name: "Niacinamide Serum 10%", brand: "The Ordinary", rating: 4 },
+    { name: "Sunscreen SPF 50+", brand: "La Shield", rating: 5 },
   ];
 
-  const toggleConcern = (concern: string) => {
-    setConcerns(prev => {
-      const next = prev.includes(concern) ? prev.filter(c => c !== concern) : [...prev, concern];
-      onUpdateProfile?.({
-        skinType: skinType,
-        concerns: next,
-        sensitivities: allergies,
-        age: skinProfile?.age ?? '',
-        routine: skinProfile?.routine ?? '',
-        climate: skinProfile?.climate ?? ''
-      });
-      return next;
-    });
-  };
 
-  const toggleAllergy = (allergy: string) => {
-    setAllergies(prev => {
-      const next = prev.includes(allergy) ? prev.filter(a => a !== allergy) : [...prev, allergy];
-      onUpdateProfile?.({
-        skinType: skinType,
-        concerns: concerns,
-        sensitivities: next,
-        age: skinProfile?.age ?? '',
-        routine: skinProfile?.routine ?? '',
-        climate: skinProfile?.climate ?? ''
-      });
-      return next;
-    });
-  };
-
-  // Sync local state when incoming profile changes (e.g., after completing quiz)
   useEffect(() => {
-    if (!skinProfile) return;
-    setSkinType(skinProfile.skinType ?? 'combination');
-    setConcerns(skinProfile.concerns ?? []);
-    setAllergies(skinProfile.sensitivities ?? []);
-  }, [skinProfile]);
+    async function fetchProfile() {
+      try {
+        const { data: sessionData } = await supabase.auth.getSession();
+        const token = sessionData?.session?.access_token;
 
-  // Propagate skinType changes to parent profile
-  useEffect(() => {
-    onUpdateProfile?.({
-      skinType,
-      concerns,
-      sensitivities: allergies,
-      age: skinProfile?.age ?? '',
-      routine: skinProfile?.routine ?? '',
-      climate: skinProfile?.climate ?? ''
-    });
-  // We want to run this when skinType changes
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [skinType]);
+        if (!token) {
+          console.warn("⚠️ No active session found");
+          setLoading(false);
+          return;
+        }
+
+        const res = await fetch("/api/user-profile", {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+
+        if (!res.ok) throw new Error(`Failed to fetch: ${res.status}`);
+
+        const data = await res.json();
+        const p = data.profile;
+
+        setProfile({
+          name: p.display_name || "User",
+          email: p.email || "No email",
+          skinType: p.skin_type || "",
+          concerns: p.skin_concerns || [],
+          sensitivities: p.sensitivities || [],
+          age: p.age || "",
+          routine: p.routine || "",
+          climate: p.climate || "",
+        });
+      } catch (err) {
+        console.error("Error fetching profile:", err);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    fetchProfile();
+  }, []);
+
+  async function updateProfile(updated: Partial<SkinProfile>) {
+    if (!profile) return;
+    const newProfile = { ...profile, ...updated };
+    setProfile(newProfile);
+
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData?.session?.access_token;
+      if (!token) return;
+
+      await fetch("/api/user-profile", {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          display_name: newProfile.name,
+          email: newProfile.email,
+          skin_type: newProfile.skinType,
+          skin_concerns: newProfile.concerns,
+          sensitivities: newProfile.sensitivities,
+        }),
+      });
+    } catch (error) {
+      console.error("Error updating profile:", error);
+    }
+  }
+
+  if (loading) return <div className="text-center text-pink-600 mt-20">Loading profile...</div>;
+  if (!profile) return <div className="text-center text-pink-600 mt-20">No profile found</div>;
 
   return (
     <div className="space-y-8 max-w-4xl mx-auto">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center space-x-4">
-          <Button 
-            variant="ghost" 
+          <Button
+            variant="ghost"
             size="icon"
-            onClick={() => onNavigate('home')}
+            onClick={() => onNavigate("home")}
             className="rounded-full hover:bg-pink-50"
           >
             <ArrowLeft className="w-5 h-5 text-pink-600" />
@@ -121,100 +179,88 @@ export function ProfileScreen({ onNavigate, skinProfile, onUpdateProfile }: Prof
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         {/* Left Column */}
         <div className="space-y-6">
-          {/* Profile Info */}
           <Card className="p-8 bg-white/70 border-pink-100">
             <div className="flex items-center space-x-6">
               <Avatar className="w-20 h-20">
                 <AvatarFallback className="bg-gradient-to-br from-pink-100 to-rose-100 text-pink-700 text-2xl">
-                  S
+                  {profile.name[0]?.toUpperCase() ?? "U"}
                 </AvatarFallback>
               </Avatar>
               <div className="flex-1">
-                <h2 className="text-xl mb-1">Sarah Johnson</h2>
-                <p className="text-gray-600 mb-3">skincare_enthusiast@email.com</p>
-                <div className="flex items-center space-x-2">
-                  <Badge className="bg-pink-50 text-pink-700 border-pink-200">
-                    Pro Member
-                  </Badge>
-                  <Badge className="bg-rose-50 text-rose-700 border-rose-200">
-                    125 Reviews
-                  </Badge>
-                </div>
+                <h2 className="text-xl mb-1">{profile.name}</h2>
+                <p className="text-gray-600 mb-3">{profile.email}</p>
+                <Badge className="bg-pink-50 text-pink-700 border-pink-200">Pro Member</Badge>
               </div>
-              <Button variant="outline" size="sm" className="border-pink-200 text-pink-600 hover:bg-pink-50">
-                <Edit className="w-4 h-4" />
-              </Button>
             </div>
           </Card>
 
+          {/* (rest of your cards remain unchanged) */}
           {/* Skin Profile */}
           <Card className="p-0 bg-white/70 border-pink-100 overflow-hidden">
             <ImageWithFallback
-              src="https://images.unsplash.com/photo-1680063122329-69ef93b72c53?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxza2luY2FyZSUyMHJvdXRpbmUlMjBwcm9kdWN0c3xlbnwxfHx8fDE3NjE2MzgxMTh8MA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral"
+              src="https://images.unsplash.com/photo-1680063122329-69ef93b72c53?auto=format&fit=crop&w=1080&q=80"
               alt="Skin profile"
               className="w-full h-32 object-cover"
             />
             <div className="p-8">
               <h3 className="text-xl mb-6">Skin Profile</h3>
-              
-              <div className="space-y-6">
-                {/* Skin Type */}
-                <div>
-                  <label className="text-sm mb-3 block text-gray-700">Skin Type</label>
-                  <Select value={skinType} onValueChange={setSkinType}>
-                    <SelectTrigger className="border-pink-200 focus:border-pink-400">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {skinTypeOptions.map(option => (
-                        <SelectItem key={option.value} value={option.value}>
-                          {option.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
 
-                {/* Skin Concerns */}
-                <div>
-                  <label className="text-sm mb-3 block text-gray-700">Skin Concerns</label>
-                  <div className="flex flex-wrap gap-2">
-                    {concernOptions.map(concern => (
-                      <Badge
-                        key={concern}
-                        variant={concerns.includes(concern) ? "default" : "outline"}
-                        className={`cursor-pointer ${
-                          concerns.includes(concern) 
-                            ? 'bg-pink-500 text-white hover:bg-pink-600' 
-                            : 'text-gray-600 hover:bg-pink-50 border-pink-200'
-                        }`}
-                        onClick={() => toggleConcern(concern)}
-                      >
-                        {concern.replace('-', ' ')}
-                      </Badge>
+              {/* Skin Type */}
+              <div className="mb-6">
+                <label className="text-sm mb-3 block text-gray-700">Skin Type</label>
+                <Select value={profile?.skinType} onValueChange={(v) => updateProfile({ skinType: v })}>
+                  <SelectTrigger className="border-pink-200 focus:border-pink-400">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {skinTypeOptions.map((opt) => (
+                      <SelectItem key={opt.value} value={opt.value}>
+                        {opt.label}
+                      </SelectItem>
                     ))}
-                  </div>
-                </div>
+                  </SelectContent>
+                </Select>
+              </div>
 
-                {/* Known Allergies */}
-                <div>
-                  <label className="text-sm mb-3 block text-gray-700">Known Allergies/Sensitivities</label>
-                  <div className="flex flex-wrap gap-2">
-                    {allergenOptions.map(allergy => (
-                      <Badge
-                        key={allergy}
-                        variant={allergies.includes(allergy) ? "destructive" : "outline"}
-                        className={`cursor-pointer ${
-                          allergies.includes(allergy) 
-                            ? 'bg-red-500 text-white hover:bg-red-600' 
-                            : 'text-gray-600 hover:bg-red-50 border-red-200'
-                        }`}
-                        onClick={() => toggleAllergy(allergy)}
-                      >
-                        {allergy.replace('-', ' ')}
-                      </Badge>
-                    ))}
-                  </div>
+              {/* Concerns */}
+              <div className="mb-6">
+                <label className="text-sm mb-3 block text-gray-700">Skin Concerns</label>
+                <div className="flex flex-wrap gap-2">
+                  {concernOptions.map((c) => (
+                    <Badge
+                      key={c}
+                      variant={profile?.concerns.includes(c) ? "default" : "outline"}
+                      className={`cursor-pointer ${
+                        profile?.concerns.includes(c)
+                          ? "bg-pink-500 text-white hover:bg-pink-600"
+                          : "text-gray-600 hover:bg-pink-50 border-pink-200"
+                      }`}
+                      onClick={() => toggleConcern(c)}
+                    >
+                      {c.replace("-", " ")}
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+
+              {/* Allergies */}
+              <div>
+                <label className="text-sm mb-3 block text-gray-700">Allergies/Sensitivities</label>
+                <div className="flex flex-wrap gap-2">
+                  {allergenOptions.map((a) => (
+                    <Badge
+                      key={a}
+                      variant={profile?.sensitivities.includes(a) ? "destructive" : "outline"}
+                      className={`cursor-pointer ${
+                        profile?.sensitivities.includes(a)
+                          ? "bg-red-500 text-white hover:bg-red-600"
+                          : "text-gray-600 hover:bg-red-50 border-red-200"
+                      }`}
+                      onClick={() => toggleAllergy(a)}
+                    >
+                      {a.replace("-", " ")}
+                    </Badge>
+                  ))}
                 </div>
               </div>
             </div>
@@ -223,11 +269,10 @@ export function ProfileScreen({ onNavigate, skinProfile, onUpdateProfile }: Prof
 
         {/* Right Column */}
         <div className="space-y-6">
-
-          {/* Favorite Products */}
+          {/* Favorites */}
           <Card className="p-0 bg-white/70 border-pink-100 overflow-hidden">
             <ImageWithFallback
-              src="https://images.unsplash.com/photo-1755196712073-a536f713aa45?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxiZWF1dHklMjBwcm9kdWN0cyUyMHNoZWxmfGVufDF8fHx8MTc2MTY1NDYxMXww&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral"
+              src="https://images.unsplash.com/photo-1755196712073-a536f713aa45?auto=format&fit=crop&w=1080&q=80"
               alt="Favorite products"
               className="w-full h-40 object-cover"
             />
@@ -236,29 +281,28 @@ export function ProfileScreen({ onNavigate, skinProfile, onUpdateProfile }: Prof
                 <h3 className="text-xl">Favorite Products</h3>
                 <Heart className="w-6 h-6 text-pink-500" />
               </div>
-              
-              <div className="space-y-4">
-                {favoriteProducts.map((product, index) => (
-                  <div key={index} className="flex items-center justify-between p-4 bg-pink-50 rounded-xl border border-pink-100">
-                    <div>
-                      <h4 className="text-sm text-gray-800">{product.name}</h4>
-                      <p className="text-xs text-gray-600">{product.brand}</p>
-                    </div>
-                    <div className="flex items-center space-x-1">
-                      {Array.from({ length: product.rating }, (_, i) => (
-                        <Star key={i} className="w-4 h-4 text-yellow-500 fill-current" />
-                      ))}
-                    </div>
+              {favoriteProducts.map((p, i) => (
+                <div
+                  key={i}
+                  className="flex items-center justify-between p-4 bg-pink-50 rounded-xl border border-pink-100 mb-2"
+                >
+                  <div>
+                    <h4 className="text-sm text-gray-800">{p.name}</h4>
+                    <p className="text-xs text-gray-600">{p.brand}</p>
                   </div>
-                ))}
-              </div>
+                  <div className="flex items-center space-x-1">
+                    {Array.from({ length: p.rating }).map((_, j) => (
+                      <Star key={j} className="w-4 h-4 text-yellow-500 fill-current" />
+                    ))}
+                  </div>
+                </div>
+              ))}
             </div>
           </Card>
 
           {/* Settings */}
           <Card className="p-8 bg-white/70 border-pink-100">
             <h3 className="text-xl mb-6">Settings</h3>
-            
             <div className="space-y-6">
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-4">
@@ -277,17 +321,6 @@ export function ProfileScreen({ onNavigate, skinProfile, onUpdateProfile }: Prof
                   <div>
                     <p className="text-sm text-gray-800">Data Privacy</p>
                     <p className="text-xs text-gray-500">Manage your data preferences</p>
-                  </div>
-                </div>
-                <ChevronRight className="w-4 h-4 text-gray-400" />
-              </div>
-
-              <div className="flex items-center justify-between cursor-pointer hover:bg-pink-50 -mx-4 px-4 py-2 rounded-lg transition-colors">
-                <div className="flex items-center space-x-4">
-                  <User className="w-5 h-5 text-pink-400" />
-                  <div>
-                    <p className="text-sm text-gray-800">Account Settings</p>
-                    <p className="text-xs text-gray-500">Update email, password</p>
                   </div>
                 </div>
                 <ChevronRight className="w-4 h-4 text-gray-400" />

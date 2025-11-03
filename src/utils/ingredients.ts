@@ -35,7 +35,7 @@ async function loadCsv(): Promise<Map<string, IngredientInfo>> {
       // Vite will include JSON imports in the bundle. Use dynamic import so it
       // resolves correctly in both dev and prod.
       // eslint-disable-next-line @typescript-eslint/no-var-requires
-  const mod = await import('../assets/dataset/ingredientsList.json');
+  const mod = await import('/assets/ingredientsList.json');
       const data: Record<string, string>[] = (mod && (mod.default || mod)) as any;
       if (Array.isArray(data)) {
         const map = new Map<string, IngredientInfo>();
@@ -70,7 +70,7 @@ async function loadCsv(): Promise<Map<string, IngredientInfo>> {
     }
 
     // Fallback: parse CSV at runtime (kept for compatibility if JSON isn't generated)
-    const url = new URL('../../assets/dataset/ingredientsList.csv', import.meta.url).href;
+    const url = new URL('/assets/ingredientsList.csv', import.meta.url).href;
     const res = await fetch(url);
     if (!res.ok) throw new Error('Failed to fetch ingredients CSV');
     const text = await res.text();
